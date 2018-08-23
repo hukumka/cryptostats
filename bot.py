@@ -1,5 +1,7 @@
 #!/usr/bin/python3
 import pickle
+import time
+import datetime
 from RepeatedTimer import RepeatedTimer
 from collector import Collector, CollectorManager
 
@@ -25,6 +27,22 @@ class ReportCollector(Collector):
 
     def generate_report(self):
         return [self.pair_report(*p) for p in self.pairs if self.is_pair_good(*p)]
+
+    def report(self):
+        report = self.generate_report()
+        return "\n".join(self.format_report_record(r) for r in report)
+
+    @staticmethod
+    def format_report_record(record):
+        header = "{} : {}".format(record['exchange'], record['pair'])
+        record['header'] = header
+        record['spread'] = 1 - record['spread']
+        record['avg_time'] = str(datetime.timedelta(seconds=int(record['avg_time']*100)))
+        print(record)
+        return """{header}
+            volume={volume:.1f}\tord_count={order_count}\tspread={spread:.3f}
+            time={avg_time}\tavg_volume={avg_volume:.6f}
+            """.format(**record)
 
     def is_pair_good(self, exchange_name, pair):
         return self.spread(exchange_name, pair) >= 0.005
@@ -71,7 +89,7 @@ class ReportCollector(Collector):
             return {
                 'exchange': exchange_name,
                 'pair': pair, 
-                'volume': volume,
+                'volume': float(volume),
                 'avg_time': avg_time,
                 'avg_volume': avg_volume,
                 'order_count': order_count,
@@ -87,13 +105,15 @@ class ReportManager(CollectorManager):
         pass
 
     def new_collector(self):
-        time.sleep(300)
         self.load_state()
 
 
 
 if __name__ == '__main__':
+    ROOT = "/home/hukumka/src/cryptostats/data/"
     bot = commands.Bot(command_prefix="&")
+    report_manager = ReportManager(ROOT, factory=ReportCollector)
+
     @bot.event
     async def on_ready():
         print("ready")
@@ -101,6 +121,12 @@ if __name__ == '__main__':
     @bot.command()
     async def check():
         await bot.say("Bot status: online")
+
+    @bot.command()
+    async def report():
+        await bot.say("Собираю отчет")
+        await bot.say(report_manager.collector.report())
+        await bot.say("Всёшеньки")
 
     with open(sys.argv[1], 'r') as token_file:
         token = token_file.read()
