@@ -3,6 +3,10 @@ import pickle
 from RepeatedTimer import RepeatedTimer
 from collector import Collector, CollectorManager
 
+import sys
+import discord
+from discord.ext import commands
+
 
 class ReportCollector(Collector):
     def load(f):
@@ -87,11 +91,17 @@ class ReportManager(CollectorManager):
         self.load_state()
 
 
+
 if __name__ == '__main__':
-    ROOT = "/home/hukumka/src/cryptostats/data/"
-    m = ReportManager(ROOT, factory=ReportCollector)
-    r = m.collector.generate_report()
-    print(r, m.collector)
-    for i in r:
-        print(i)
-    
+    bot = commands.Bot(command_prefix="&")
+    @bot.event
+    async def on_ready():
+        print("ready")
+
+    @bot.command()
+    async def check():
+        await bot.say("Bot status: online")
+
+    with open(sys.argv[1], 'r') as token_file:
+        token = token_file.read()
+        bot.run(token.strip())
