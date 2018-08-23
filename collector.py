@@ -29,9 +29,12 @@ class Collector:
             'pairs': 'pairs.csv',
         }
         self.path = root
+        self.graphs = {}
+        self.iterations = 0
         if not path.isdir(self.path):
             os.mkdir(self.path)
         if pairs is None:
+            print("trying pairs")
             self.pairs = self.get_suitable_pairs()
         else:
             self.pairs = pairs
@@ -67,14 +70,19 @@ class Collector:
         for e in self.EXCHANGES:
             api = exchange.api_by_name(e)
             pairs = exchange.PairGraph(api)
+            self.graphs[e] = pairs
             for pair in pairs.markets:
                 if self.is_pair_suitable(e, pairs, pair):
                     result.append((e, pair['symbol']))
         return result
 
+    def get_graph(self, exchange_name):
+        if exchange_name not in self.graphs:
+            self.graphs[exchange_name] = exchange.PairGraph(exchange.api_by_name(exchange_name))
+        return self.graphs[exchange_name]
 
     def is_pair_suitable(self, exchange, pairs_graph, pair):
-        print_if_verbose("Checking pair {}:\"{}\"".format(exchange, pair['symbol']))
+        print("Checking pair {}:\"{}\"".format(exchange, pair['symbol']))
         ticker = pairs_graph.exchange.fetch_ticker(pair['symbol'])
         bid_volume, quote_volume = ticker['bidVolume'], ticker['quoteVolume']
         btc_volume = pairs_graph.convert_currency(pair['quote'], 'BTC', quote_volume)
@@ -89,18 +97,39 @@ class Collector:
 
     def collect(self):
         print("Collector.collect({})".format(self.path))
-        self.log('log', 'Collector.collect')
+        self.log('log', "Collector.collect({})".format(self.path))
         for exchange_name, pair in self.pairs:
-            self.collect_trades(exchange_name, pair)
+            api = exchange.api_by_name(exchange_name)
+            self.collect_trades(api, exchange_name, pair)
+            self.collect_order_book(api, exchange_name, pair)
+            time.sleep(0.5)
+        self.iterations += 1
 
-    def collect_trades(self, exchange_name, pair):
+    def collect_order_book(self, api, exchange_name, pair):
+        print("Collector.collect_order_book({}, {})".format(exchange_name, pair))
+        self.log('log', "Collector.collect_order_book({}, {})".format(exchange_name, pair))
+        book_file_id = ("order_book", exchange_name, pair)
+        file_id = ("spread", exchange_name, pair)
+        order_book = api.fetch_order_book(pair)
+        print_if_verbose("Spread={}".format((order_book['asks'][0][0]-order_book['bids'][0][0])/order_book['bids'][0][0]))
+        self.log(file_id, order_book['asks'][0][0], order_book['bids'][0][0])
+        print_if_verbose("asks: ", order_book['asks'])
+        print_if_verbose("bids: ", order_book['bids'])
+        for ask in order_book['asks']:
+            self.log(book_file_id, self.iterations, 'ask', ask[0], ask[1])
+        for bid in order_book['bids']:
+            self.log(book_file_id, self.iterations, 'bid', bid[0], bid[1])
+
+    def collect_trades(self, api, exchange_name, pair):
+        pair_from, pair_to = tuple(pair.split('/'))
         print("Collector.collect_trades({}, {})".format(exchange_name, pair))
-        file_id = (exchange_name, pair)
+        self.log('log', "Collector.collect_trades({}, {})".format(exchange_name, pair))
+        file_id = ("trades", exchange_name, pair)
         try:
             last_trade_data = self.last_line(file_id).decode('utf-8')
             last_trade_data = [x.strip() for x in last_trade_data.split(',')]
-            timestamp = int(x[1])
-            trade_id = int(x[2])
+            timestamp = int(last_trade_data[1])
+            trade_id = int(last_trade_data[2])
             print_if_verbose("Log found: keep adding records with timestamp>{}".format(timestamp))
             new_only = True
         except subprocess.CalledProcessError:
@@ -109,7 +138,7 @@ class Collector:
             print_if_verbose("Log not found: create new and add all records")
             new_only = True
 
-        trades = exchange.api_by_name(exchange_name).fetch_trades(pair)
+        trades = api.fetch_trades(pair)
         trades.sort(key=lambda x: (x['timestamp'], x['id']))
         for t in trades:
             if t['timestamp'] >= timestamp and t['id'] != trade_id:
@@ -118,8 +147,9 @@ class Collector:
                 side = t['side']
                 price = t['price']
                 amount = t['amount']
-                self.log(file_id, timestamp, trade_id, side, price, amount, "break="+str(new_only))
-                new_only = True
+                amount_btc = self.get_graph(exchange_name).convert_currency(pair_from, 'BTC', amount)
+                self.log(file_id, timestamp, trade_id, side, price, amount, "break="+str(new_only), amount_btc)
+                new_only = False
                 print_if_verbose("Add record timestamp={} id={} volume={} price={}".format(timestamp, trade_id, amount, price))
             else:
                 new_only = False
@@ -129,14 +159,17 @@ class Collector:
     def save_state(self, f):
         pickle.dump({
             'current_collector_root': self.path,
-            'pairs': self.pairs
+            'pairs': self.pairs,
+            'iterations': self.iterations
         }, f)
 
     def load(f):
         state = pickle.load(f)
         collector_root = state['current_collector_root']
         pairs = state['pairs']
+        iterations = state['iterations']
         collector = Collector(collector_root, pairs=pairs)
+        collector.iterations = iterations
         collector.log('log', 'Collector.load({}, {})'.format(collector_root, pairs))
         return collector
 
@@ -152,7 +185,7 @@ class CollectorManager:
         self.factory = factory
         self.state_file = state_file
         if forget_state or not self.load_state() :
-            self.__new_collector()
+            self.new_collector()
 
     def save_state(self):
         with open(path.join(self.root, "collector_manager", self.state_file), 'wb') as f:
@@ -168,6 +201,7 @@ class CollectorManager:
 
     def collect(self):
         self.collector.collect()
+        self.save_state()
 
     def is_old(self):
         date = str(datetime.now().date())
@@ -176,10 +210,10 @@ class CollectorManager:
 
     def take_collected(self):
         collector_root = self.collector.path
-        self.__new_collector()
+        self.new_collector()
         return collector_root
 
-    def __new_collector(self):
+    def new_collector(self):
         date = str(datetime.now().date())
         collector_root = path.join(self.root, date)
         self.collector = self.factory(collector_root)
@@ -215,7 +249,7 @@ if __name__ == '__main__':
 
     print(cmd_args)
 
-    INTERVAL = 60
+    INTERVAL = 120
 
 
     def collect():
@@ -224,6 +258,7 @@ if __name__ == '__main__':
             print_if_verbose("new manager created")
 
         manager.collect()
+        manager.save_state
         print_if_verbose("collected")
 
     try:
