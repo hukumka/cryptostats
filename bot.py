@@ -51,7 +51,6 @@ class ReportCollector(Collector):
         record['header'] = header
         record['spread'] = 1 - record['spread']
         record['avg_time'] = str(datetime.timedelta(seconds=int(record['avg_time']*100)))
-        print(record)
         return """{header}
             volume={volume:.1f}\tord_count={order_count}\tspread={spread:.3f}
             time={avg_time}\tavg_volume={avg_volume:.6f}
@@ -124,7 +123,6 @@ class ReportManager(CollectorManager):
         date = datetime.datetime.now()
         delta = datetime.timedelta(days=back)
         date -= delta
-        print(date.date())
         date = str(date.date())
         collector_root = path.join(self.root, date)
         collector = self.factory(collector_root)
@@ -147,7 +145,9 @@ if __name__ == '__main__':
     @bot.command()
     async def report(back:int=1):
         await bot.say("Собираю отчет")
-        await bot.say(report_manager.report(back))
+        report = report_manager.report(back)
+        print(report)
+        await bot.say(report)
         await bot.say("Всёшеньки")
 
     with open(sys.argv[1], 'r') as token_file:
