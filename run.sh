@@ -6,7 +6,7 @@ cd /home/hukumka/src/cryptostats/
 if [ "stop" = "$1" ]
 then
     killall collector.py &>/dev/null
-    killall discord_bot.py &>/dev/null
+    killall bot.py &>/dev/null
     exit # kill all processes and do not start any more
 elif [ "git_pull" = "$1" ]
 then
@@ -14,7 +14,7 @@ then
     git pull origin master
     echo "Kill all"
     killall collector.py &>/dev/null
-    killall discord_bot.py &>/dev/null
+    killall bot.py &>/dev/null
     echo "Restart"
     ./collector.py -d &
     ./bot.py bot.key &

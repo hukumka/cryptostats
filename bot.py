@@ -3,6 +3,7 @@ import pickle
 import time
 import datetime
 import os
+from os import path
 from RepeatedTimer import RepeatedTimer
 from collector import Collector, CollectorManager
 
@@ -12,6 +13,17 @@ from discord.ext import commands
 
 
 class ReportCollector(Collector):
+    def get_suitable_pairs(self):
+        pairs = []
+        self.pair_volumes = {}
+        with self.file('pairs', 'r') as f:
+            for l in f:
+                args = [x.strip() for x in l.split(',')]
+                pair = (args[1], args[2])
+                pairs.append(pair)
+                self.pair_volumes[pair] = float(args[5])
+        return pairs
+
     def load(f):
         state = pickle.load(f)
         collector_root = state['current_collector_root']
@@ -108,6 +120,15 @@ class ReportManager(CollectorManager):
     def new_collector(self):
         self.load_state()
 
+    def report(self, back):
+        date = datetime.datetime.now()
+        delta = datetime.timedelta(days=back)
+        date -= delta
+        print(date.date())
+        date = str(date.date())
+        collector_root = path.join(self.root, date)
+        collector = self.factory(collector_root)
+        return collector.report()
 
 
 if __name__ == '__main__':
@@ -124,9 +145,9 @@ if __name__ == '__main__':
         await bot.say("Bot status: online")
 
     @bot.command()
-    async def report():
+    async def report(back:int=1):
         await bot.say("Собираю отчет")
-        await bot.say(report_manager.collector.report())
+        await bot.say(report_manager.report(back))
         await bot.say("Всёшеньки")
 
     with open(sys.argv[1], 'r') as token_file:
