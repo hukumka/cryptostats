@@ -20,7 +20,7 @@ then
     ./bot.py bot.key &
     echo "Done"
 else
-    ./collector.py &>/dev/null
+    ./collector.py >/dev/null &
     ./bot.py bot.key &
 fi
 
