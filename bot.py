@@ -146,8 +146,12 @@ if __name__ == '__main__':
     async def report(back:int=1):
         await bot.say("Собираю отчет")
         report = report_manager.report(back)
-        print(report)
-        await bot.say(report)
+        if len(report) > 2000:
+            r = [report[r:r+2000] for r in range(0, len(report), 2000)]
+        else:
+            r = [report]
+        for i in r:
+            await bot.say(i)
         await bot.say("Всёшеньки")
 
     with open(sys.argv[1], 'r') as token_file:
