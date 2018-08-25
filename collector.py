@@ -26,7 +26,7 @@ def print(*args):
 
 
 class Collector:
-    EXCHANGES = ('exmo',)
+    EXCHANGES = ('exmo', 'hitbtc', 'livecoin')
     BTC_VOLUME_LIMIT = 20
 
     def __init__(self, root, pairs=None):
