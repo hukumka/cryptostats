@@ -3,6 +3,7 @@ import pickle
 import time
 import datetime
 import os
+import traceback
 from os import path
 from RepeatedTimer import RepeatedTimer
 from collector import Collector, CollectorManager
@@ -145,14 +146,18 @@ if __name__ == '__main__':
     @bot.command()
     async def report(back:int=1):
         await bot.say("Собираю отчет")
-        report = report_manager.report(back)
-        if len(report) > 2000:
-            r = [report[r:r+2000] for r in range(0, len(report), 2000)]
-        else:
-            r = [report]
-        for i in r:
-            await bot.say(i)
-        await bot.say("Всёшеньки")
+        try:
+            report = report_manager.report(back)
+            if len(report) > 2000:
+                r = [report[r:r+2000] for r in range(0, len(report), 2000)]
+            else:
+                r = [report]
+            for i in r:
+                await bot.say(i)
+            await bot.say("Всёшеньки")
+        except Exception as e:
+            await bot.say(traceback.format_exc())
+            raise e
 
     with open(sys.argv[1], 'r') as token_file:
         token = token_file.read()
