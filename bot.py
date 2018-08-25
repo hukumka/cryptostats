@@ -13,6 +13,14 @@ import discord
 from discord.ext import commands
 
 
+print_native = print
+def print(*args):
+    try:
+        print_native(*args)
+    except OSError as e:
+        pass
+
+
 class ReportCollector(Collector):
     def get_suitable_pairs(self):
         pairs = []

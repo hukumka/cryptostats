@@ -17,6 +17,13 @@ from RepeatedTimer import RepeatedTimer
 
 ROOT = "/home/hukumka/src/cryptostats/data/"
 
+print_native = print
+def print(*args):
+    try:
+        print_native(*args)
+    except OSError as e:
+        pass
+
 
 class Collector:
     EXCHANGES = ('exmo',)
