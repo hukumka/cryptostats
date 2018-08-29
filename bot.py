@@ -7,6 +7,7 @@ import traceback
 from os import path
 from RepeatedTimer import RepeatedTimer
 from collector import Collector, CollectorManager
+import subprocess
 
 import sys
 import discord
@@ -150,6 +151,10 @@ if __name__ == '__main__':
     @bot.command()
     async def check():
         await bot.say("Bot status: online")
+        ps = subprocess.Popen(('ps', '-A'), stdout=subprocess.PIPE)
+        output = subprocess.check_output(('grep', 'collector.py'), stdin=ps.stdout)
+        ps.wait()
+        await bot.say("Collector status: " + output.decode('utf-8'))
 
     @bot.command()
     async def report(back:int=1):
