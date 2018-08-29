@@ -157,6 +157,11 @@ if __name__ == '__main__':
         await bot.say("Collector status: " + output.decode('utf-8'))
 
     @bot.command()
+    async def restart():
+        os.system("./run.sh &")
+        sys.exit(0)
+
+    @bot.command()
     async def report(back:int=1):
         await bot.say("Собираю отчет")
         try:
