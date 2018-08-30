@@ -7,6 +7,7 @@ import pickle
 import threading
 import time
 import subprocess
+import traceback
 
 from os import path
 from datetime import datetime
