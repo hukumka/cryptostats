@@ -240,39 +240,46 @@ def print_if_verbose(*args, **kwargs):
 
 if __name__ == '__main__':
     # setup sigint and sigterm handling
-    running = True
-    def stop_running(signum, frame):
-        global running
-        print("Terminated", signum, frame)
-        running = False
-    signal.signal(signal.SIGINT, stop_running)
-    signal.signal(signal.SIGTERM, stop_running)
-
-    parser = argparse.ArgumentParser(description='Run collector process')
-    parser.add_argument("-d", "--drop", action="store_true", help="ignore previous state")
-    parser.add_argument("-v", "--verbose", action="store_true", help="Extra level of verbosity")
-    cmd_args = parser.parse_args()
-    manager = CollectorManager(ROOT, forget_state=cmd_args.drop)
-
-    print(cmd_args)
-
-    INTERVAL = 120
-
-
-    def collect():
-        if manager.is_old():
-            manager.take_collected()
-            print_if_verbose("new manager created")
+    with open("data/collector_manager/last_error.txt", "w") as f:
+        f.write("empty\n")
+        f.close()
+    try:
+        running = True
+        def stop_running(signum, frame):
+            global running
+            print("Terminated", signum, frame)
+            running = False
+        signal.signal(signal.SIGINT, stop_running)
+        signal.signal(signal.SIGTERM, stop_running)
+ 
+        parser = argparse.ArgumentParser(description='Run collector process')
+        parser.add_argument("-d", "--drop", action="store_true", help="ignore previous state")
+        parser.add_argument("-v", "--verbose", action="store_true", help="Extra level of verbosity")
+        cmd_args = parser.parse_args()
+        manager = CollectorManager(ROOT, forget_state=cmd_args.drop)
+ 
+        print(cmd_args)
+ 
+        INTERVAL = 120
+ 
+        def collect():
+            if manager.is_old():
+                manager.take_collected()
+                print_if_verbose("new manager created")
 
         manager.collect()
         manager.save_state
         print_if_verbose("collected")
 
-    try:
         timer = RepeatedTimer(INTERVAL, collect)
         collect()  # timer will call only after interval passes
         while running:
             pass
+    except Exception as e:
+        with open("data/collector_manager/last_error.txt", "w") as f:
+            f.write(traceback.format_exc())
+            f.close()
+        raise e
     finally:
         print("Cleaning up")
         timer.stop()

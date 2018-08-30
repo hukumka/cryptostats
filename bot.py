@@ -162,6 +162,12 @@ if __name__ == '__main__':
         sys.exit(0)
 
     @bot.command()
+    async def last_error():
+        with open("data/collector_manager/last_error.txt", "r") as f:
+            msg = f.read(f);
+            await bot.say(msg)
+
+    @bot.command()
     async def report(back:int=1):
         await bot.say("Собираю отчет")
         try:
